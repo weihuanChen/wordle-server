@@ -1,9 +1,30 @@
 node_modules/
 dist/
 .env
+.env.local
+.env.production.local
+.env.*.local
 *.log
 .DS_Store
 *.swp
 *.swo
 *~
+
+# Backups
+backups/
+*.sql
+*.sql.gz
+
+# SSL Certificates
+docker/nginx/ssl/*.pem
+docker/nginx/ssl/*.key
+docker/nginx/ssl/*.crt
+
+# Docker volumes data
+postgres_data/
+redis_data/
+
+# Logs
+logs/
+docker/nginx/logs/
 

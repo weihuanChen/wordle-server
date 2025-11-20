@@ -1,0 +1,14 @@
+{
+  "dev": {
+    "driver": "pg",
+    "host": {"ENV": "PGHOST"},
+    "port": {"ENV": "PGPORT"},
+    "database": {"ENV": "PGDATABASE"},
+    "user": {"ENV": "PGUSER"},
+    "password": {"ENV": "PGPASSWORD"}
+  },
+  "production": {
+    "driver": "pg",
+    "connectionString": {"ENV": "DATABASE_URL"}
+  }
+}

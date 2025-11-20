@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wordle Decryption Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #4CAF50;
+      padding-bottom: 10px;
+    }
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      background: #f9f9f9;
+      border-radius: 5px;
+    }
+    .section h2 {
+      color: #666;
+      font-size: 18px;
+      margin-top: 0;
+    }
+    pre {
+      background: #2d2d2d;
+      color: #f8f8f2;
+      padding: 15px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    .success {
+      color: #4CAF50;
+      font-weight: bold;
+    }
+    .error {
+      color: #f44336;
+      font-weight: bold;
+    }
+    .answers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .answer-word {
+      background: #4CAF50;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 5px;
+      font-size: 18px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 Wordle API Decryption Test</h1>
+
+    <div class="section">
+      <h2>1. Fetch Today's Puzzle</h2>
+      <button onclick="fetchPuzzle()">Fetch Octordle Puzzle</button>
+      <pre id="puzzle-data">Click button to fetch puzzle...</pre>
+    </div>
+
+    <div class="section">
+      <h2>2. Decrypted Answers</h2>
+      <div id="decrypted-answers">
+        <em>Fetch puzzle first to decrypt answers...</em>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>3. Test Word Verification</h2>
+      <input type="text" id="word-input" placeholder="Enter a 5-letter word" style="padding: 8px; font-size: 16px; width: 200px;">
+      <button onclick="verifyWord()">Verify Word</button>
+      <pre id="verify-result">Enter a word and click verify...</pre>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:3000';
+    const ENCRYPTION_SECRET = 'your-secret-encryption-key-change-me-in-production';
+    let currentPuzzleData = null;
+
+    // Utility function to generate encryption key from salt
+    function generateEncryptionKey(salt) {
+      return CryptoJS.SHA256(ENCRYPTION_SECRET + salt).toString();
+    }
+
+    // Decrypt answers using the salt
+    function decryptAnswers(encryptedData, salt) {
+      try {
+        const key = generateEncryptionKey(salt);
+        const decrypted = CryptoJS.AES.decrypt(encryptedData, key);
+        const plaintext = decrypted.toString(CryptoJS.enc.Utf8);
+        return JSON.parse(plaintext);
+      } catch (error) {
+        console.error('Decryption error:', error);
+        return null;
+      }
+    }
+
+    // Fetch today's puzzle
+    async function fetchPuzzle() {
+      try {
+        const response = await fetch(`${API_BASE}/daily/octordle/en`);
+        const data = await response.json();
+        currentPuzzleData = data;
+
+        document.getElementById('puzzle-data').textContent = JSON.stringify(data, null, 2);
+
+        // Decrypt the answers
+        const answers = decryptAnswers(data.encryptedAnswers, data.salt);
+
+        if (answers) {
+          const answersHtml = `
+            <div class="success">✅ Decryption successful!</div>
+            <div class="answers">
+              ${answers.map(word => `<div class="answer-word">${word}</div>`).join('')}
+            </div>
+            <p><strong>Total answers:</strong> ${answers.length}</p>
+            <pre>${JSON.stringify(answers, null, 2)}</pre>
+          `;
+          document.getElementById('decrypted-answers').innerHTML = answersHtml;
+        } else {
+          document.getElementById('decrypted-answers').innerHTML =
+            '<div class="error">❌ Decryption failed!</div>';
+        }
+      } catch (error) {
+        document.getElementById('puzzle-data').textContent = `Error: ${error.message}`;
+        document.getElementById('decrypted-answers').innerHTML =
+          `<div class="error">❌ Error fetching puzzle: ${error.message}</div>`;
+      }
+    }
+
+    // Verify a word
+    async function verifyWord() {
+      const word = document.getElementById('word-input').value.trim().toLowerCase();
+      if (!word) {
+        alert('Please enter a word');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/verify/en/${word}`);
+        const data = await response.json();
+
+        const resultHtml = `
+          <strong>Word:</strong> ${data.word}
+          <strong>Valid:</strong> ${data.valid ? '✅ Yes' : '❌ No'}
+          <strong>Answer Candidate:</strong> ${data.isAnswerCandidate ? '✅ Yes' : '❌ No'}
+        `;
+
+        document.getElementById('verify-result').innerHTML = resultHtml;
+      } catch (error) {
+        document.getElementById('verify-result').textContent = `Error: ${error.message}`;
+      }
+    }
+
+    // Allow Enter key to verify word
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('word-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          verifyWord();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+{
+  "name": "wordle-server",
+  "version": "1.0.0",
+  "description": "Hono.js server with PostgreSQL and Redis",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "node test/test.js",
+    "migrate": "node-pg-migrate",
+    "migrate:up": "node-pg-migrate up",
+    "migrate:down": "node-pg-migrate down",
+    "migrate:create": "node-pg-migrate create",
+    "import:words": "tsx scripts/import-words.ts",
+    "generate:puzzle": "tsx scripts/generate-daily.ts",
+    "generate:secrets": "node scripts/generate-secrets.js",
+    "generate:secrets:write": "node scripts/generate-secrets.js --write"
+  },
+  "keywords": [
+    "hono",
+    "postgresql",
+    "redis",
+    "docker"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@hono/node-server": "^1.12.0",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.4.7",
+    "hono": "^4.6.0",
+    "ioredis": "^5.4.1",
+    "node-pg-migrate": "^8.0.3",
+    "pg": "^8.13.1",
+    "pino": "^9.5.0",
+    "pino-pretty": "^11.2.2"
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

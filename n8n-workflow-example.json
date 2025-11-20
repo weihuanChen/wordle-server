@@ -1,0 +1,214 @@
+{
+  "name": "Wordle Daily Puzzle Generator with AI",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "name": "Schedule Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "id": "schedule-trigger",
+      "notes": "每天自动触发生成新谜题"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:3000/admin/candidates",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "count",
+                "value": "15"
+              },
+              {
+                "name": "language",
+                "value": "en"
+              }
+            ]
+          }
+        }
+      },
+      "name": "Get Candidate Words",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300],
+      "id": "get-candidates",
+      "notes": "获取15个候选单词供AI筛选",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Wordle API Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "text": "=你是一个专业的单词游戏内容审核专家。我需要你从以下候选单词中精选出 8 个最适合作为 Wordle/Octordle 游戏答案的单词。\n\n候选单词列表：\n{{ $json.candidates }}\n\n筛选标准：\n1. 必须去除任何可能冒犯、敏感或不适合的单词\n2. 确保单词多样性（避免相似的字母组合）\n3. 平衡难度（包含常见词和稍难的词）\n4. 优先选择日常用语\n5. 确保所有单词都是 5 个字母的有效英文单词\n\n请以 JSON 格式返回你精选的 8 个单词：\n\n{\n  \"selected\": [\"word1\", \"word2\", \"word3\", \"word4\", \"word5\", \"word6\", \"word7\", \"word8\"],\n  \"reasoning\": \"简短说明选择理由\",\n  \"rejected\": [\"被排除的单词和原因\"]\n}\n\n只返回 JSON，不要其他说明。",
+        "options": {
+          "temperature": 0.7,
+          "maxTokens": 1000
+        }
+      },
+      "name": "AI Filter Words",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [650, 300],
+      "id": "ai-filter",
+      "notes": "使用Claude AI过滤和精选单词"
+    },
+    {
+      "parameters": {
+        "functionCode": "// 从 AI 响应中提取单词列表\nconst aiResponse = $input.item.json.response || $input.item.json;\nlet selectedWords;\n\n// 尝试解析 AI 的响应\ntry {\n  let parsed;\n  if (typeof aiResponse === 'string') {\n    parsed = JSON.parse(aiResponse);\n  } else {\n    parsed = aiResponse;\n  }\n  \n  selectedWords = parsed.selected;\n  \n  if (!Array.isArray(selectedWords)) {\n    throw new Error('Selected words is not an array');\n  }\n  \n} catch (error) {\n  console.error('Failed to parse AI response:', error);\n  // 如果解析失败，使用候选词的前8个\n  const candidates = $input.item.json.candidates || [];\n  selectedWords = candidates.slice(0, 8);\n}\n\n// 验证单词数量\nif (selectedWords.length !== 8) {\n  throw new Error(`Expected 8 words, got ${selectedWords.length}`);\n}\n\n// 转换为小写并清理\nselectedWords = selectedWords.map(w => w.toLowerCase().trim());\n\n// 计算明天的日期\nconst tomorrow = new Date();\ntomorrow.setDate(tomorrow.getDate() + 1);\nconst dateStr = tomorrow.toISOString().split('T')[0];\n\n// 返回用于下一步的数据\nreturn {\n  json: {\n    answers: selectedWords,\n    date: dateStr,\n    gameType: 'octordle',\n    language: 'en',\n    regenerate: false,\n    aiReasoning: aiResponse.reasoning || 'N/A',\n    aiRejected: aiResponse.rejected || []\n  }\n};"
+      },
+      "name": "Process AI Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "id": "process-response",
+      "notes": "处理AI响应并准备API调用数据"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/admin/generate-puzzle",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "gameType",
+              "value": "={{ $json.gameType }}"
+            },
+            {
+              "name": "language",
+              "value": "={{ $json.language }}"
+            },
+            {
+              "name": "date",
+              "value": "={{ $json.date }}"
+            },
+            {
+              "name": "answers",
+              "value": "={{ $json.answers }}"
+            },
+            {
+              "name": "regenerate",
+              "value": "={{ $json.regenerate }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "name": "Submit Puzzle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [1050, 300],
+      "id": "submit-puzzle",
+      "notes": "提交精选的单词生成每日谜题",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "Wordle API Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "=✅ 每日 Octordle 谜题已生成！\n\n📅 日期: {{ $json.puzzle.date }}\n🎮 游戏类型: {{ $json.puzzle.gameType }}\n🔤 单词数量: {{ $json.puzzle.answerCount }}\n\n🤖 AI 选择理由:\n{{ $('Process AI Response').item.json.aiReasoning }}\n\n📊 谜题 ID: {{ $json.puzzle.id }}\n🔐 已加密: ✓\n💾 已缓存: ✓",
+        "options": {}
+      },
+      "name": "Success Notification",
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "id": "notification",
+      "notes": "发送成功通知（可选，可改为Slack/Email）",
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Schedule Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Candidate Words",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Candidate Words": {
+      "main": [
+        [
+          {
+            "node": "AI Filter Words",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Filter Words": {
+      "main": [
+        [
+          {
+            "node": "Process AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process AI Response": {
+      "main": [
+        [
+          {
+            "node": "Submit Puzzle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Puzzle": {
+      "main": [
+        [
+          {
+            "node": "Success Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "instanceId": "wordle-puzzle-generator"
+  },
+  "tags": []
+}
